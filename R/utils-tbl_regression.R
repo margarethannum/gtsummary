@@ -32,6 +32,14 @@ tidy_wrap <- function(x, exponentiate, conf.level) {
     )
   }
 
+  if (class(x)[1] %in% "crr") { # can add other classes later. Need exact subclass.
+    tidy_bit <- riskybiz::tidy(
+      x,
+      exponentiate = exponentiate,
+      conf.level = conf.level, conf.int = T
+    )
+  }
+
   if (!(class(x)[1] %in% mixed_classes)) {
     tidy_bit <- broom::tidy(
       x,
