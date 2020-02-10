@@ -16,6 +16,7 @@
 #'  \item{[geepack::geeglm]}
 #' }
 #' @name tidy_vetted
+#' @keywords internal
 #' @section model support:
 #' If [broom::tidy] or [broom.mixed::tidy] support a class of model not listed
 #' above, please submit a [GitHub Issue](https://github.com/ddsjoberg/gtsummary/issues).
@@ -34,10 +35,14 @@
 #' confidence limits are calculated using Wald's method.
 #' @examples
 #' my_tidy <- function(x, exponentiate =  FALSE, conf.level = 0.95, ...) {
-#'   dplyr::bind_cols(
-#'     broom::tidy(x, exponentiate = exponentiate, conf.int = FALSE),
-#'     broom::confint_tidy(x, func = stats::confint.default, conf.level = conf.level)
-#'   )
+#'   tidy <-
+#'     dplyr::bind_cols(
+#'       broom::tidy(x, conf.int = FALSE),
+#'       broom::confint_tidy(x, func = stats::confint.default, conf.level = conf.level)
+#'     )
+#'   # exponentiating, if requested
+#'   if (exponentiate == TRUE)
+#'     tidy <- dplyr::mutate_at(vars(estimate, conf.low, conf.high), exp)
 #' }
 #'
 #' lm(age ~ grade + response, trial) %>%

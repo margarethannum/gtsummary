@@ -29,7 +29,7 @@
 #'     tbls = list(t1, t2),
 #'     tab_spanner = c("**Tumor Response**", "**Time to Death**")
 #'   )
-#' \donttest{
+#'
 #' # Descriptive statistics alongside univariate regression, with no spanning header
 #' t3 <-
 #'   trial[c("age", "grade", "response")] %>%
@@ -47,7 +47,6 @@
 #'   tbl_merge(tbls = list(t3, t4)) %>%
 #'   as_gt(include = -tab_spanner) %>%
 #'   gt::cols_label(stat_0_1 = gt::md("**Summary Statistics**"))
-#' }
 #' @section Example Output:
 #' \if{html}{Example 1}
 #'
@@ -65,13 +64,13 @@ tbl_merge <- function(tbls, tab_spanner = NULL) {
   }
 
   # class of tbls
-  if (!"list" %in% class(tbls)) {
+  if (!inherits(tbls, "list")) {
     stop("Expecting 'tbls' to be a list, e.g. 'tbls = list(tbl1, tbl2)'")
   }
 
   # checking all inputs are class tbl_regression, tbl_uvregression,
   # tbl_regression, tbl_summary, or tbl_stack
-  if (!map_chr(tbls, class) %in%
+  if (!map_chr(tbls, ~class(.x)[1]) %in%
     c("tbl_regression", "tbl_uvregression", "tbl_summary", "tbl_stack") %>% all()) {
     stop(paste(
       "All objects in 'tbls' must be class 'tbl_regression',",
@@ -97,19 +96,6 @@ tbl_merge <- function(tbls, tab_spanner = NULL) {
       " need to be re-applied after `tbl_merge()`."
     ))
   }
-
-  # for tbl_summary, moving footnote above label column to the first stat_* column
-  tbls <- map_if(
-    tbls,
-    ~ class(.x) == "tbl_summary",
-    function(x) {
-      x$table_header$footnote[startsWith(x$table_header$column, "stat_")] <-
-        x$table_header$footnote[x$table_header$column == "label"][1]
-
-      x$table_header$footnote[x$table_header$column == "label"][1] <- list(NULL)
-      return(x)
-    }
-  )
 
   # merging tables -------------------------------------------------------------
   # nesting data by variable (one line per variable), and renaming columns with number suffix
@@ -178,8 +164,7 @@ tbl_merge <- function(tbls, tab_spanner = NULL) {
       tbls,
       ~ pluck(.x, "table_header") %>%
         mutate(
-          column = paste0(.data$column, "_", .y),
-          fmt = stringr::str_replace(fmt, stringr::fixed("x$"), paste0("x$tbls[[", .y, "]]$"))
+          column = paste0(.data$column, "_", .y)
         )
     ) %>%
     # using the identifying columns from first passed object
@@ -204,9 +189,6 @@ tbl_merge <- function(tbls, tab_spanner = NULL) {
     table_body = table_body,
     table_header = table_header,
     tbls = tbls,
-    estimate_funs = map(tbl_inputs(tbls), pluck("estimate_fun")),
-    pvalue_funs = map(tbl_inputs(tbls), pluck("pvalue_fun")),
-    qvalue_funs = map(tbls, pluck("qvalue_fun")),
     call_list = list(tbl_merge = match.call()),
     gt_calls = eval(gt_tbl_merge),
     kable_calls = eval(kable_tbl_merge)
@@ -215,7 +197,7 @@ tbl_merge <- function(tbls, tab_spanner = NULL) {
   # writing additional gt and kable calls with data from table_header
   results <- update_calls_from_table_header(results)
 
-  class(results) <- "tbl_merge"
+  class(results) <- c("tbl_merge", "gtsummary")
   results
 }
 
@@ -242,11 +224,11 @@ gt_tbl_merge <- quote(list(
       tbls,
       function(x, y) {
         # returning NULL for non-regression objects
-        if (!class(x) %in% c("tbl_regression", "tbl_uvregression", "tbl_stack")) {
+        if (!inherits(x, c("tbl_regression", "tbl_uvregression", "tbl_stack"))) {
           return(NULL)
         }
-        if (class(x) == "tbl_stack" &&
-          !class(x$tbl_regression_list[[1]]) %in% c("tbl_regression", "tbl_uvregression")) {
+        if (inherits(x, "tbl_stack") &&
+          !inherits(x$tbls[[1]], c("tbl_regression", "tbl_uvregression"))) {
           return(NULL)
         }
         # making gt missing code for references
@@ -295,11 +277,11 @@ kable_tbl_merge <- quote(list(
       tbls,
       function(x, y) {
         # returning NULL for non-regression objects
-        if (!class(x) %in% c("tbl_regression", "tbl_uvregression", "tbl_stack")) {
+        if (!inherits(x, c("tbl_regression", "tbl_uvregression", "tbl_stack"))) {
           return(NULL)
         }
-        if (class(x) == "tbl_stack" &&
-          !class(x$tbl_regression_list[[1]]) %in% c("tbl_regression", "tbl_uvregression")) {
+        if (inherits(x, "tbl_stack") &&
+            !inherits(x$tbls[[1]], c("tbl_regression", "tbl_uvregression"))) {
           return(NULL)
         }
         # making mutate missing code for references
@@ -322,11 +304,11 @@ tbl_inputs <- function(tbl) {
   map(
     tbl,
     function(tbl) {
-      if (class(tbl) %in% c("tbl_regression", "tbl_stack", "tbl_summary")) {
+      if (inherits(tbl, c("tbl_regression", "tbl_uvregression", "tbl_stack"))) {
         return(pluck(tbl, "inputs"))
       }
-      if (class(tbl) == "tbl_uvregression") {
-        return(pluck(tbl, "tbl_regression_list", 1, "inputs"))
+      if (inherits(tbl, "tbl_uvregression")) {
+        return(pluck(tbl, "tbls", 1, "inputs"))
       }
     }
   )
