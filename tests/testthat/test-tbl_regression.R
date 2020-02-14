@@ -15,8 +15,9 @@ library(lme4)
 # 7. add_n returns appropriate number for model
 # 8. Model works with tbl_regression and tbl_uvregression
 
+# function to pull estimates from tbl_regression object
+# input gt object, output vector of coefficients
 coefs_in_gt <- function(object) {
-  #function to pull estimates from tbl_regression object
   object$table_body %>%
     dplyr::pull(estimate) %>%
     na.omit() %>%
@@ -27,27 +28,27 @@ coefs_in_gt <- function(object) {
 mod_lm <- lm(hp ~ am + disp + as.factor(cyl), # adding different variable types
              data = mtcars)
 
-coefs <- data.frame(betas = coef(mod_lm)[-1])
-
-tbl_lm <- tbl_regression(mod_lm)
-
-
-
-
-all.equal(coefs_in_gt(tbl_lm), coefs$betas)
-
 # 1. Runs as expected without errors, warnings, messages (basic usage)
 test_that("lm: no errors/warnings with standard use", {
   # build model
-  mod_lm <- lm(hp ~ am, data = mtcars)
+  mod_lm <- lm(hp ~ am+ disp + as.factor(cyl), data = mtcars)
+  coefs <- data.frame(betas = coef(mod_lm)[-1])
   # check standard usage
   expect_error(tbl_lm <- tbl_regression(mod_lm), NA)
   expect_warning(tbl_regression(mod_lm), NA)
   # check that tbl_regression object output matches model output
   expect_equivalent(
-    coef(mod_lm) %>% {.[1, 2:ncol(.)]},
-    tbl_lme4$table_body %>% pull(estimate) %>% discard(is.na)
+    coefs$betas,
+    coefs_in_gt(tbl_lm)
   )
+  # check labels
+
+  # expect_equivalent(
+  #   tbl_lm$table_body$label[tbl_lm$table_body$row_type == "label"], # labels in gt object
+  #   #1. check if labels match label input (from label argument)
+  #   #2. for those not labeled from label argument, check that labels match labels
+  #   # in data fram
+  # )
 })
 
 # 2. Runs as expected without errors, warnings, messages (edge cases specific to the model type, such as using cubic splines, interaction terms, different outcome types)
@@ -55,17 +56,6 @@ test_that("lm with tidyfun: no errors/warnings with standard use", {
   expect_error(tbl_regression(mod_lm, tidy_fun = broom::tidy), NA)
   expect_warning(tbl_regression(mod_lm, tidy_fun = broom::tidy), NA)
 })
-
-# 3. Check labels
-
-# 4. Check that numbers in model match the table_body of tbl_regression object
-test_that(
-  expect_equivalent(
-  coef(mod_lm)[[1]] %>% {.[1, 2:ncol(.)]} %>% map_dbl(exp),
-  tbl_lme4$table_body %>% pull(estimate) %>% discard(is.na)
-)
-)
-
 
 # 5. Check Exponentiating works
 # Not aplicable
