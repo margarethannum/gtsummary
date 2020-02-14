@@ -2,8 +2,80 @@ context("test-tbl_regression")
 library(survival)
 library(lme4)
 
+# Proposed list of checks all "vetted" models should pass.
+# When adding a new "vetted model", copy paste the below list and
+# add appropriate section of unit tests to cover the below.
 
-mod_lm <- lm(hp ~ am, data = mtcars)
+# 1. Runs as expected without errors, warnings, messages (standard usage)
+# 2. Runs as expected without errors, warnings, messages (edge cases specific to the model type, such as using cubic splines, interaction terms, different outcome types)
+# 3. Check labels
+# 4. Check that numbers in model match the table_body of tbl_regression object
+# 5. Check Exponentiating works
+# 6. add_nevent and check that it works appropriately
+# 7. add_n returns appropriate number for model
+# 8. Model works with tbl_regression and tbl_uvregression
+
+coefs_in_gt <- function(object) {
+  #function to pull estimates from tbl_regression object
+  object$table_body %>%
+    dplyr::pull(estimate) %>%
+    na.omit() %>%
+    as.vector()
+}
+
+# Linear models using lm() -----
+mod_lm <- lm(hp ~ am + disp + as.factor(cyl), # adding different variable types
+             data = mtcars)
+
+coefs <- data.frame(betas = coef(mod_lm)[-1])
+
+tbl_lm <- tbl_regression(mod_lm)
+
+
+
+
+all.equal(coefs_in_gt(tbl_lm), coefs$betas)
+
+# 1. Runs as expected without errors, warnings, messages (basic usage)
+test_that("lm: no errors/warnings with standard use", {
+  # build model
+  mod_lm <- lm(hp ~ am, data = mtcars)
+  # check standard usage
+  expect_error(tbl_lm <- tbl_regression(mod_lm), NA)
+  expect_warning(tbl_regression(mod_lm), NA)
+  # check that tbl_regression object output matches model output
+  expect_equivalent(
+    coef(mod_lm) %>% {.[1, 2:ncol(.)]},
+    tbl_lme4$table_body %>% pull(estimate) %>% discard(is.na)
+  )
+})
+
+# 2. Runs as expected without errors, warnings, messages (edge cases specific to the model type, such as using cubic splines, interaction terms, different outcome types)
+test_that("lm with tidyfun: no errors/warnings with standard use", {
+  expect_error(tbl_regression(mod_lm, tidy_fun = broom::tidy), NA)
+  expect_warning(tbl_regression(mod_lm, tidy_fun = broom::tidy), NA)
+})
+
+# 3. Check labels
+
+# 4. Check that numbers in model match the table_body of tbl_regression object
+test_that(
+  expect_equivalent(
+  coef(mod_lm)[[1]] %>% {.[1, 2:ncol(.)]} %>% map_dbl(exp),
+  tbl_lme4$table_body %>% pull(estimate) %>% discard(is.na)
+)
+)
+
+
+# 5. Check Exponentiating works
+# Not aplicable
+
+# 6. add_nevent and check that it works appropriately
+# 7. add_n returns appropriate number for model
+# 8. Model works with tbl_regression and tbl_uvregression
+
+
+
 mod_survreg <- survreg(Surv(time, status) ~ age + ph.ecog, data = lung)
 mod_logistic <- glm(response ~ age + stage, trial, family = binomial)
 mod_poisson <- glm(count ~ age + trt,
@@ -33,15 +105,7 @@ test_that("glm: logistic and poisson regression", {
   expect_warning(tbl_regression(mod_poisson, exponentiate = TRUE, show_single_row = "trt"), NA)
 })
 
-test_that("lm: no errors/warnings with standard use", {
-  expect_error(tbl_regression(mod_lm), NA)
-  expect_warning(tbl_regression(mod_lm), NA)
-})
 
-test_that("lm with tidyfun: no errors/warnings with standard use", {
-  expect_error(tbl_regression(mod_lm, tidy_fun = broom::tidy), NA)
-  expect_warning(tbl_regression(mod_lm, tidy_fun = broom::tidy), NA)
-})
 
 
 test_that("survreg: no errors/warnings with standard use", {
